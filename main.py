@@ -1,4 +1,5 @@
 import pygame
+import os
 
 pygame.init()
 
@@ -12,6 +13,9 @@ pygame.display.set_caption('Shooter')
 clock = pygame.time.Clock()
 FPS = 60
 
+# defune player.action variables
+GRAVITY = 0.75
+
 # define player action variables
 moving_left = False
 moving_right = False
@@ -19,35 +23,43 @@ moving_right = False
 # define colours
 BG = (144, 201, 120)
 
+RED = (255, 0, 0)
 
 def draw_bg():
     screen.fill(BG)
+    pygame.draw.line(screen, RED, (0, 300), (SCREEN_WIDTH, 300))
 
 
 class Soldier(pygame.sprite.Sprite):
     def __init__(self, char_type, x, y, scale, speed):
         self.char_type = char_type;
         pygame.sprite.Sprite.__init__(self)
+        self.alive = True
         self.speed = speed
         self.direction = 1
+        self.vel_y =0;
+        self.jump = False
+        self.in_air = True
         self.flip = False
         self.animation_list = []
         self.frame_index = 0
         self.action = 0
         self.update_time = pygame.time.get_ticks()
-        temp_list = []
-        for i in range(5):
-            img = pygame.image.load(f'img/{self.char_type}/Idle/{i}.png')
-            img = pygame.transform.scale(img, (int(img.get_width() * scale), int(img.get_height() * scale)))
-            temp_list.append(img)
-        self.animation_list.append(temp_list)
 
-        temp_list = []
-        for i in range(6):
-            img = pygame.image.load(f'img/{self.char_type}/Run/{i}.png')
-            img = pygame.transform.scale(img, (int(img.get_width() * scale), int(img.get_height() * scale)))
-            temp_list.append(img)
-        self.animation_list.append(temp_list)
+
+        # load all images for the players
+        animations_types = ['Idle', 'Run', 'Jump']
+        for animation in animations_types:
+            # reset temporary list images
+            temp_list = []
+            # count number of files in the folder
+            num_of_frames = len(os.listdir(f'img/{self.char_type}/{animation}'))
+            for i in range(num_of_frames):
+                img = pygame.image.load(f'img/{self.char_type}/{animation}/{i}.png')
+                img = pygame.transform.scale(img, (int(img.get_width() * scale), int(img.get_height() * scale)))
+                temp_list.append(img)
+            self.animation_list.append(temp_list)
+
         self.image = self.animation_list[self.action][self.frame_index]
 
         self.rect = self.image.get_rect()
@@ -62,13 +74,31 @@ class Soldier(pygame.sprite.Sprite):
         if moving_left:
             dx = -self.speed
             self.flip = True
-            self.direction = -1;
+            self.direction = -1
         if moving_right:
             dx = self.speed
             self.flip = False
-            self.direction = 1;
+            self.direction = 1
 
-            # update rectangle posotion
+        # jump
+        if self.jump == True and self.in_air == False:
+            self.vel_y = -11
+            self.jump = False
+            self.in_air = True
+
+        # apply gravity
+        self.vel_y += GRAVITY
+        if self.vel_y > 10:
+            self.vel_y
+        dy += self.vel_y
+
+        # check collision with floor
+        if self.rect.bottom + dy > 300:
+            dy = 300 - self.rect.bottom
+            self.in_air = False
+
+
+        # update rectangle posotion
         self.rect.x += dx
         self.rect.y += dy
 
@@ -78,26 +108,23 @@ class Soldier(pygame.sprite.Sprite):
     def update_animation(self):
         # update_animation
         ANIMATION_COOLDOWN = 100
-        #update image depending on current frame
+        # update image depending on current frame
         self.image = self.animation_list[self.action][self.frame_index]
-        #check if enough time has passed since the last update
+        # check if enough time has passed since the last update
         if pygame.time.get_ticks() - self.update_time > ANIMATION_COOLDOWN:
             self.update_time = pygame.time.get_ticks()
             self.frame_index += 1
-        #if the animatio has run out the reset back to the start
+        # if the animatio has run out the reset back to the start
         if self.frame_index >= len(self.animation_list[self.action]):
             self.frame_index = 0
 
-
-
     def update_action(self, new_action):
-    #check if new acition is different to the previous one
+        # check if new acition is different to the previous one
         if new_action != self.action:
             self.action = new_action
-#             update animation settings
+            #             update animation settings
             self.frame_index = 0
             self.update_time = pygame.time.get_ticks()
-
 
 
 player = Soldier('player', 200, 200, 3, 5)
@@ -112,24 +139,29 @@ while run:
     player.update_animation()
     player.draw()
     enemy.draw()
+
     # update player action
-    if moving_left or moving_right:
-        player.update_action(1)
-    else:
-        player.update_action(0)
-    player.move(moving_left, moving_right)
+    if player.alive:
+        if player.in_air :
+            player.update_action(2)
+        elif moving_left or moving_right:
+            player.update_action(1)
+        else:
+            player.update_action(0)
+        player.move(moving_left, moving_right)
 
     for event in pygame.event.get():
 
         if event.type == pygame.QUIT:
             run = False
         # keyboard press
-
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_a:
                 moving_left = True
             if event.key == pygame.K_d:
                 moving_right = True
+            if event.key == pygame.K_w and player.alive:
+                player.jump = True
             if event.key == pygame.K_ESCAPE:
                 run = False
 
